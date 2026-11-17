@@ -17,6 +17,7 @@ DESCONTO_MIN = 20      # avisa quando o menor preco estiver 20 por cento abaixo 
 ITENS = []             # lista de IDs para vigiar. Vazio = vigia todos. Ex.: [1031429, 21070012]
 DEMANDA_MIN = 2        # demanda minima no Rolimon's (0 a 4). Evita itens que ninguem compra
 PRECO_MIN = 100        # ignora itens com valor menor que isso (em Robux)
+VALOR_MAX = 1000       # ignora itens com valor MAIOR que isso (em Robux). Aumente quando tiver mais Robux
 IGNORAR_PROJETADOS = True   # ignora itens marcados como projected (preco manipulado)
 SO_COM_LUCRO = False   # True = so avisa se der lucro na revenda (depois da taxa de 30 por cento)
 MAX_ITENS = 300        # vigia no maximo esses itens por execucao (os mais valiosos), para o Roblox nao bloquear
@@ -59,7 +60,7 @@ def valores_rolimons():
     for id_texto, d in dados["items"].items():
         nome, rap, valor, demanda, projetado = d[0], d[2], d[3], d[5], d[7]
         referencia = valor if valor and valor > 0 else rap   # se nao tem valor, usa o RAP
-        if not referencia or referencia < PRECO_MIN:
+        if not referencia or referencia < PRECO_MIN or referencia > VALOR_MAX:
             continue
         if IGNORAR_PROJETADOS and projetado is not None and projetado > 0:
             continue   # item projected: preco inflado por trocas combinadas
