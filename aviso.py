@@ -19,6 +19,8 @@ DEMANDA_MIN = 2        # demanda minima no Rolimon's (0 a 4). Evita itens que ni
 PRECO_MIN = 100        # ignora itens com valor menor que isso (em Robux)
 IGNORAR_PROJETADOS = True   # ignora itens marcados como projected (preco manipulado)
 SO_COM_LUCRO = False   # True = so avisa se der lucro na revenda (depois da taxa de 30 por cento)
+MAX_ITENS = 300        # vigia no maximo esses itens por execucao (os mais valiosos), para o Roblox nao bloquear
+PAUSA_LOTES = 5        # segundos de pausa entre os lotes
 ARQUIVO_ESTADO = "estado.json"   # guarda o que ja foi avisado entre uma execucao e outra
 # --------------------------------------------------------------------------
 
@@ -64,7 +66,14 @@ def valores_rolimons():
         if ITENS and int(id_texto) not in ITENS:
             continue
         itens[int(id_texto)] = (nome, referencia, rap if rap and rap > 0 else referencia)
+    if len(itens) > MAX_ITENS:   # fica so com os MAX_ITENS de maior valor
+        ordenados = sorted(itens.items(), key=lambda par: par[1][1], reverse=True)
+        itens = dict(ordenados[:MAX_ITENS])
     return itens
+
+
+class LimiteExcedido(Exception):
+    pass
 
 
 def menores_precos(ids):
@@ -85,6 +94,8 @@ def menores_precos(ids):
             if erro.code == 403 and tentativa == 0:
                 csrf["token"] = erro.headers.get("x-csrf-token", "")   # pega o token e tenta de novo
                 continue
+            if erro.code == 429:
+                raise LimiteExcedido()   # o Roblox pediu para ir mais devagar
             raise
     return {}
 
@@ -102,7 +113,11 @@ def rodada():
     ids = list(referencias.keys())
     for inicio in range(0, len(ids), 100):          # o Roblox aceita lotes de ate 100 itens
         lote = ids[inicio:inicio + 100]
-        precos = menores_precos(lote)
+        try:
+            precos = menores_precos(lote)
+        except LimiteExcedido:
+            print("O Roblox pediu para esperar (erro 429). Paro por agora e tento na proxima execucao.")
+            return
         for item_id in lote:
             preco = precos.get(item_id)
             nome, valor, rap = referencias[item_id]
@@ -121,7 +136,7 @@ def rodada():
                     "Lucro estimado na revenda (apos taxa de 30%%): %d R$\n"
                     "https://www.roblox.com/catalog/%d" % (nome, preco, valor, rap, desconto, lucro, item_id))
                 print("Aviso enviado:", nome, preco)
-        time.sleep(2)                                # pausa entre lotes para nao sobrecarregar
+        time.sleep(PAUSA_LOTES)                      # pausa entre lotes para nao sobrecarregar
 
 
 def main():
