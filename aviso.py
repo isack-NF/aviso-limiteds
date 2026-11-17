@@ -1,5 +1,5 @@
 # ==========================================================================
-# AVISO DE LIMITEDS BARATOS (Roblox -> Discord)
+# AVISO DE LIMITEDS BARATOS (Roblox -> Discord) - versao para rodar no PC
 # Este script NAO compra nada e NAO pede senha nem cookie.
 # Ele confere precos publicos e manda um aviso no seu Discord quando um
 # limitado esta abaixo do valor. Voce compra na mao, no site do Roblox.
@@ -12,7 +12,7 @@ import urllib.request
 import urllib.error
 
 # ------------------------- CONFIGURE AQUI ---------------------------------
-WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "")   # vem do segredo do GitHub (nao fica no arquivo)
+WEBHOOK_URL = "https://discord.com/api/webhooks/1572098942378840164/BpA8x0wFVR_-DpNZ7dZkC-LSCiahsnw95zkCQzOB6E5jMH5EXz7c5aDnncoZgwF7JFh-"   # link do webhook do seu canal do Discord
 DESCONTO_MIN = 20      # avisa quando o menor preco estiver 20 por cento abaixo do valor
 ITENS = []             # lista de IDs para vigiar. Vazio = vigia todos. Ex.: [1031429, 21070012]
 DEMANDA_MIN = 2        # demanda minima no Rolimon's (0 a 4). Evita itens que ninguem compra
@@ -21,6 +21,8 @@ IGNORAR_PROJETADOS = True   # ignora itens marcados como projected (preco manipu
 SO_COM_LUCRO = False   # True = so avisa se der lucro na revenda (depois da taxa de 30 por cento)
 MAX_ITENS = 300        # vigia no maximo esses itens por execucao (os mais valiosos), para o Roblox nao bloquear
 PAUSA_LOTES = 5        # segundos de pausa entre os lotes
+INTERVALO = 120        # segundos entre cada rodada (mais devagar para o Roblox nao bloquear)
+ESPERA_429 = 300       # segundos de espera quando o Roblox pede para ir devagar
 ARQUIVO_ESTADO = "estado.json"   # guarda o que ja foi avisado entre uma execucao e outra
 # --------------------------------------------------------------------------
 
@@ -116,8 +118,8 @@ def rodada():
         try:
             precos = menores_precos(lote)
         except LimiteExcedido:
-            print("O Roblox pediu para esperar (erro 429). Paro por agora e tento na proxima execucao.")
-            return
+            print("O Roblox pediu para esperar (erro 429).")
+            return True
         for item_id in lote:
             preco = precos.get(item_id)
             nome, valor, rap = referencias[item_id]
@@ -137,18 +139,24 @@ def rodada():
                     "https://www.roblox.com/catalog/%d" % (nome, preco, valor, rap, desconto, lucro, item_id))
                 print("Aviso enviado:", nome, preco)
         time.sleep(PAUSA_LOTES)                      # pausa entre lotes para nao sobrecarregar
+    return False
 
 
 def main():
-    if not WEBHOOK_URL:
-        print("Faltou o segredo WEBHOOK_URL.")
-        raise SystemExit(1)
     carregar_estado()
-    try:
-        rodada()
-    finally:
-        salvar_estado()   # salva mesmo se der erro no meio
-    print("Execucao terminada.")
+    print("Aviso de limiteds ligado. Aperte Ctrl+C para parar.")
+    while True:
+        try:
+            bloqueado = rodada()
+        except Exception as erro:
+            bloqueado = False
+            print("Erro nesta rodada (vou tentar de novo):", erro)
+        salvar_estado()
+        if bloqueado:
+            print("Esperando %d segundos antes de tentar de novo..." % ESPERA_429)
+            time.sleep(ESPERA_429)
+        else:
+            time.sleep(INTERVALO)
 
 
 if __name__ == "__main__":
